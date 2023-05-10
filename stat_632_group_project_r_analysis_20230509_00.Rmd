@@ -1,0 +1,296 @@
+---
+title: "Stat 632 Group Project, Spring 2023"
+author: "Linda, Siva, Brihana"
+date: '2023-04-24'
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(car)
+library(dplyr)
+library(corrplot)
+library(ggcorrplot)
+library(ordinal)
+
+#install.packages("corrplot")
+```
+
+```{r}
+initial_data <- read.csv("ObesityDataSet_raw_and_data_sinthetic.csv", stringsAsFactors = T)
+
+#physical_activity_data <- read.csv("Filtered_on_physcial_activity_Nutrition__Physical_Activity__and_Obesity_-_Behavioral_Risk_Factor_Surveillance_System_20230423.csv")
+```
+
+
+## Estimation of obesity levels based on eating habits and physical condition Data Set 
+
+Paper: Dataset for estimation of obesity levels based on eating habits and physical condition in individuals from Colombia, Peru and Mexico
+https://www.sciencedirect.com/science/article/pii/S2352340919306985#tbl1
+
+Dataset
+https://archive.ics.uci.edu/ml/datasets/Estimation+of+obesity+levels+based+on+eating+habits+and+physical+condition+
+
+
+Displaying to the first 10 rows of the data set.
+```{r}
+head(initial_data, n = 10)
+```
+
+
+## Null Hypothesis:
+Family history of obesity increases the risk of having obesity. 
+
+## Alternative Hypothesis:
+Family history does not increase the risk of having obesity. 
+
+
+
+## Multiple Linear Regression Variables / Features:
+
+@attribute Gender {Female,Male}
+@attribute Age numeric
+@attribute Height numeric
+@attribute Weight numeric
+@attribute family_history_with_overweight {yes,no}
+@attribute FAVC {yes,no}
+@attribute FCVC numeric
+@attribute NCP numeric
+@attribute CAEC {no,Sometimes,Frequently,Always}
+@attribute SMOKE {yes,no}
+@attribute CH2O numeric
+@attribute SCC {yes,no}
+@attribute FAF numeric
+@attribute TUE numeric
+@attribute CALC {no,Sometimes,Frequently,Always}
+@attribute MTRANS {Automobile,Motorbike,Bike,Public_Transportation,Walking}
+@attribute NObeyesdad {Insufficient_Weight,Normal_Weight,Overweight_Level_I,Overweight_Level_II,Obesity_Type_I,Obesity_Type_II,Obesity_Type_III}
+
+
+## Data Prep
+
+
+## Exploratory Data Analysis and Visualizations 
+
+Summary of the data
+```{r}
+nrow(initial_data)
+ncol(initial_data)
+summary(initial_data)
+```
+
+## Initial correlation plot of the data
+```{r}
+num_cols <- sapply(initial_data, is.numeric)
+mydata_num <- initial_data[, num_cols]
+cor_mat <- cor(mydata_num)
+corrplot(cor_mat)
+```
+
+
+
+
+## Checking for total number of NA's
+```{r}
+sum(is.na(initial_data))
+```
+
+## Plot of weight classification feature
+```{r}
+plot(initial_data$NObeyesdad)
+```
+
+## Converting categoricals factor to numeric
+```{r}
+## need to encode the factor variables 
+new_data <- initial_data %>% mutate_if(is.factor, as.numeric)
+head(new_data)
+```
+## Plotting the correlation plot.
+
+```{r}
+num_cols <- sapply(new_data, is.numeric)
+mydata_num_1 <- new_data[, num_cols]
+cor_mat <- cor(mydata_num_1)
+corrplot(cor_mat)
+```
+## Scatter Plot Matrix of a Multiple Linear Regression Model
+
+```{r}
+pairs(new_data)
+```
+```{r}
+view(new_data)
+```
+
+
+
+```{r}
+#new_data_no_height_weight_df <- df[,c('Gender', 'Age', 'family_history_with_overweight', 'FAVC', 'FCVC', 'NCP', 'CAEC', 'SMOKE', 'CH2O', 'SCC', 'FAF', 'TUE', 'CALC', 'MTRANS')]
+
+df_no_age_weight <- subset(new_data, select = -c(Height, Weight))
+  #select(new_data, -Height, -Weight) 
+
+head(df_no_age_weight)
+```
+
+
+## Converting the response variable into an ordinal. Testing this out after presentation was given. Commenting out.
+```{r}
+#df_no_age_weight$NObeyesdad <- ordered(df_no_age_weight$NObeyesdad, 
+                                       #levels = c("Insufficient_Weight", 
+                                      #            "Normal_Weight", 
+                                      #            "Overweight_Level_I", 
+                                      #            "Overweight_Level_II", 
+                                      #            "Obesity_Type_I", 
+                                      #            "Obesity_Type_II", 
+                                      #            "Obesity_Type_III"))
+```
+
+```{r}
+head(df_no_age_weight)
+```
+
+```{r}
+summary(df_no_age_weight)
+```
+
+## Fitting the linear model.
+
+```{r}
+m1 <- lm(NObeyesdad ~ FCVC + NCP + CAEC + SMOKE + CH2O + SCC + FAF + TUE + CALC + MTRANS, data = df_no_age_weight)
+```
+
+## Summary of the model
+`
+```{r}
+summary(m1)
+```
+
+
+```{r}
+num_cols <- sapply(df_no_age_weight, is.numeric)
+mydata_num_2 <- df_no_age_weight[, num_cols]
+cor_mat_1 <- cor(mydata_num_2)
+#M = corrplot(cor_mat)
+corrplot(cor_mat_1, method = 'square', order = 'FPC', type = 'lower', diag = FALSE)
+```
+
+## Model fit, original (not converted to ordinal)
+
+```{r}
+m1 <- lm(NObeyesdad ~ Gender + Age + family_history_with_overweight + FAVC + FCVC + NCP  + CAEC + SMOKE + CH2O + SCC + FAF + TUE +CALC + MTRANS, data = new_data)
+summary(m1)
+
+```
+
+```{r}
+#m1 <- clm(NObeyesdad ~ FCVC + NCP + CAEC + SMOKE + CH2O + SCC + FAF + TUE + CALC + MTRANS, data = df_no_age_weight)
+```
+
+## Performing step function on the model using AIC: Akaike's An Information Criterion
+
+```{r}
+m2 <- step(m1)
+```
+
+
+## Creating a vector of model residuals
+```{r}
+residuals <- residuals(m2)
+head(residuals)
+```
+
+```{r}
+if (any(is.na(residuals) | !is.finite(residuals))) {
+  stop("Residuals contain missing or infinite values. QQ plot cannot be created.")
+}
+```
+
+# Create a QQ plot of the residuals
+```{r}
+qqnorm(residuals)
+qqline(residuals)
+```
+
+
+
+
+## Summary of the model
+```{r}
+summary(m2)
+```
+
+## Residuals Plot of fitted model
+```{r}
+res <- resid(m2)
+plot(fitted(m2), res)
+
+#add a horizontal line at 0 
+abline(0,0)
+```
+
+## Q-Q plot
+```{r}
+qqnorm(res)
+qqline(res)
+```
+
+## Taking the log of the Weight value
+```{r}
+#new_data$Weight <- log(new_data$Weight)
+#new_data$Weight
+```
+
+
+## Box-Cox to tranform data into a more normally distributed dataset.
+```{r}
+# library(MASS)
+# library(car)
+bcox <- boxcox(m2, lambda = seq(-5, 5, by = 0.1))
+summary(powerTransform(m2))
+```
+
+```{r}
+m3 <- lm(NObeyesdad^0.5247 ~., data=new_data)
+m4 <- step(m3)
+```
+
+```{r}
+summary(m4)
+```
+
+
+```{r}
+AIC(m4)
+```
+
+
+```{}
+regression_eq = -0.8377126 +  0.0040998(age) -0.5964036(height) + 2.1456942(weight) + 0.0323383(family_history)  -0.0618441(FAVC) -0.0464515(FCVC) -0.0275380(NCP) + 0.0387620(CAEC) + 0.0131555(CH2O) + 0.0787687(SCC) + 0.0062833(MTRANS)
+```
+
+## Partial f test, 0.3644
+```{r}
+anova(m3, m4)
+```
+
+## The value of p is greater than 0.05.So we fail to reject that the coefficients of these variables are equal to zero. This agrees with the step wise selection
+
+```{r}
+plot(m4)
+```
+
+
+
+
+
